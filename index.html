@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Tracker</title>
+
+<style>
+:root {
+  --bg: #0f0f0f;
+  --card: #1a1a1a;
+  --accent: #6366f1;
+  --text: #ffffff;
+  --sub: #9ca3af;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.container {
+  max-width: 1100px;
+  margin: auto;
+  padding: 24px 16px;
+}
+
+/* HEADER */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+/* LOGO STYLE */
+.logo {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* BUTTON GROUP */
+.btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  background: var(--accent);
+  border: none;
+  width: 36px;
+  height: 36px;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 18px;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  opacity: 0.9;
+}
+
+/* FORM */
+.form {
+  background: var(--card);
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  animation: fadeIn 0.2s ease;
+}
+
+input {
+  flex: 1;
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
+  background: #111;
+  color: white;
+}
+
+/* CARD */
+.card {
+  background: var(--card);
+  padding: 16px;
+  border-radius: 14px;
+  margin-bottom: 14px;
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sub {
+  font-size: 12px;
+  color: var(--sub);
+  margin-top: 2px;
+}
+
+/* PROGRESS */
+.progress-bar {
+  height: 6px;
+  background: #333;
+  border-radius: 4px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #9333ea);
+  transition: width 0.3s ease;
+}
+
+/* ROW */
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+select {
+  padding: 6px;
+  border-radius: 6px;
+  border: none;
+  background: #111;
+  color: white;
+  font-size: 12px;
+}
+
+/* STATUS */
+.status {
+  font-size: 12px;
+}
+
+.green { color: #22c55e; }
+.red { color: #ef4444; }
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="top-bar">
+    <div class="logo">PROJECT TRACKER</div>
+
+    <div class="btn-group">
+      <button onclick="toggleForm()">+</button>
+      <button onclick="downloadReport()">⬇</button>
+    </div>
+  </div>
+
+  <div id="form" class="form" style="display:none;">
+    <input id="nama" placeholder="Nama Project">
+    <input id="po" placeholder="Pemberi PO">
+    <button onclick="addProject()">✔</button>
+  </div>
+
+  <div id="list"></div>
+
+</div>
+
+<script>
+
+const steps = [
+  "Penawaran",
+  "Diskusi + Supplier",
+  "Quotation",
+  "PO & Pengadaan",
+  "BAST / Handover",
+  "Invoice",
+  "Pencairan (Potong 5%)",
+  "Bayar PPN"
+];
+
+let projects = JSON.parse(localStorage.getItem("jbm_projects")) || [];
+
+function save() {
+  localStorage.setItem("jbm_projects", JSON.stringify(projects));
+}
+
+function toggleForm() {
+  let f = document.getElementById("form");
+  f.style.display = f.style.display === "none" ? "flex" : "none";
+}
+
+function addProject() {
+  const nama = document.getElementById("nama").value.trim();
+  const po = document.getElementById("po").value.trim();
+
+  if (!nama || !po) return alert("Data harus lengkap");
+
+  projects.push({
+    id: Date.now(),
+    nama,
+    po,
+    step: 1,
+    pajak: false,
+    last_update: new Date().toLocaleString()
+  });
+
+  save();
+  render();
+
+  document.getElementById("nama").value = "";
+  document.getElementById("po").value = "";
+}
+
+function updateStep(id, step) {
+  const p = projects.find(x => x.id === id);
+  step = parseInt(step);
+
+  if (step < 1 || step > 8) return;
+
+  p.step = step;
+  if (step < 8) p.pajak = false;
+
+  p.last_update = new Date().toLocaleString();
+  save();
+  render();
+}
+
+function togglePajak(id) {
+  const p = projects.find(x => x.id === id);
+  if (p.step < 8) return alert("PPN hanya setelah step 8");
+
+  p.pajak = !p.pajak;
+  p.last_update = new Date().toLocaleString();
+  save();
+  render();
+}
+
+function selesaiProject(id) {
+  const p = projects.find(x => x.id === id);
+  if (!(p.step === 8 && p.pajak)) return;
+
+  if (!confirm("Selesaikan project?")) return;
+
+  projects = projects.filter(x => x.id !== id);
+  save();
+  render();
+}
+
+function getProgress(step) {
+  return (step / 8) * 100;
+}
+
+/* DOWNLOAD REPORT */
+function downloadReport() {
+  if (projects.length === 0) return alert("Tidak ada data");
+
+  let text = "PROJECT TRACKER REPORT\n";
+  text += "===========================\n\n";
+
+  projects.forEach((p, i) => {
+    const progress = getProgress(p.step);
+
+    text += `Project ${i+1}\n`;
+    text += `Nama       : ${p.nama}\n`;
+    text += `PO         : ${p.po}\n`;
+    text += `Step       : ${steps[p.step - 1]}\n`;
+    text += `Progress   : ${progress.toFixed(0)}%\n`;
+    text += `PPN        : ${p.pajak ? "Sudah" : "Belum"}\n`;
+    text += `Update     : ${p.last_update}\n`;
+    text += "---------------------------\n";
+  });
+
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "project_report.txt";
+  a.click();
+}
+
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  projects.forEach(p => {
+    const progress = getProgress(p.step);
+    const canClose = (p.step === 8 && p.pajak);
+
+    const div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <div class="title">${p.nama}</div>
+      <div class="sub">PO: ${p.po}</div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" style="width:${progress}%"></div>
+      </div>
+
+      <div class="row">
+        <div class="sub">${steps[p.step - 1]} (${progress.toFixed(0)}%)</div>
+
+        <select onchange="updateStep(${p.id}, this.value)">
+          ${steps.map((s,i)=>`
+            <option value="${i+1}" ${p.step===i+1?'selected':''}>
+              ${i+1}. ${s}
+            </option>
+          `).join("")}
+        </select>
+      </div>
+
+      <div class="row">
+        <div class="status ${p.pajak ? 'green' : 'red'}">
+          ${p.pajak ? 'PPN: Sudah' : 'PPN: Belum'}
+        </div>
+
+        <div class="actions">
+          <button onclick="togglePajak(${p.id})">P</button>
+          ${canClose ? `<button onclick="selesaiProject(${p.id})">✓</button>` : ""}
+        </div>
+      </div>
+
+      <div class="sub">Update: ${p.last_update}</div>
+    `;
+
+    list.appendChild(div);
+  });
+}
+
+render();
+
+</script>
+
+</body>
+</html>
