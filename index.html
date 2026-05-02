@@ -48,6 +48,7 @@
     </style>
 
     <script>
+        // Set up Tailwind config
         tailwind.config = {
             theme: {
                 extend: {
@@ -73,13 +74,15 @@
         const { motion, AnimatePresence } = window.Motion;
 
         // Firebase Configuration
+        // IMPORTANT: Replace this ENTIRE object with the one from your Firebase Console
+        // Project Settings -> General -> Your Apps -> Firebase Config
         const firebaseConfig = {
-            apiKey: "AIzaSyByzGEUc-reZQ8LUBa3q1WMm899w08doTo",
+            apiKey: "AIzaSyByzGEUc-reZQ8LUBa3q1WMm899w08doTo", // <-- Ganti ini dengan API Key dari project-tracker-2f6a5
             authDomain: "project-tracker-2f6a5.firebaseapp.com",
             projectId: "project-tracker-2f6a5",
             storageBucket: "project-tracker-2f6a5.firebasestorage.app",
-            messagingSenderId: "356494294342",
-            appId: "1:356494294342:web:c060463e3415b105977947"
+            messagingSenderId: "356494294342", // <-- Ganti ini juga jika berbeda di console
+            appId: "1:356494294342:web:c060463e3415b105977947" // <-- Ganti ini juga jika berbeda di console
         };
 
         // Initialize Firebase
@@ -87,6 +90,9 @@
             firebase.initializeApp(firebaseConfig);
         }
         const auth = firebase.auth();
+        
+        // Coba inisialisasi database default dulu, karena biasanya project baru pakai '(default)'
+        // Jika kamu pakai database khusus, gunakan: firebase.app().firestore("nama-db")
         const db = firebase.firestore();
 
         // Constants
@@ -109,6 +115,12 @@
             8: "Invoice / BAST"
         };
 
+        // Components
+        const Icon = ({ name, className }) => {
+            const LucideIcon = lucide.icons[name.charAt(0).toUpperCase() + name.slice(1)];
+            return LucideIcon ? <i data-lucide={name} className={className}></i> : null;
+        };
+
         // Helper to refresh lucide icons after render
         const useLucide = () => {
             useEffect(() => {
@@ -116,42 +128,34 @@
             });
         };
 
-        const Icon = ({ name, className }) => {
-            return <i data-lucide={name} className={className}></i>;
-        };
-
         function App() {
             useLucide();
             const [user, setUser] = useState(null);
             const [projects, setProjects] = useState([]);
             const [loading, setLoading] = useState(true);
-            const [authError, setAuthError] = useState(null);
             const [searchQuery, setSearchQuery] = useState('');
             const [showForm, setShowForm] = useState(false);
             const [activeFilePrompt, setActiveFilePrompt] = useState(null);
             const [formData, setFormData] = useState({ name: '', po: '', company: '' });
 
-            // Auth State — FIXED: getRedirectResult called first, then onAuthStateChanged
+            // Auth State
             useEffect(() => {
-                auth.getRedirectResult()
-                    .then((result) => {
-                        if (result && result.user) {
-                            console.log("Login successful via redirect:", result.user.email);
-                            // onAuthStateChanged will handle setting user state
-                        }
-                    })
-                    .catch((error) => {
-                        console.error("Redirect Auth Error:", error);
-                        if (error.code !== 'auth/no-auth-event') {
-                            setAuthError(error.message);
-                        }
-                    });
+                // Handle Redirect Result for GitHub Pages compatibility
+                auth.getRedirectResult().then((result) => {
+                    if (result && result.user) {
+                        console.log("Login successful via redirect:", result.user);
+                    }
+                }).catch((error) => {
+                    console.error("Redirect Auth Error:", error);
+                    if (error.code === 'auth/unauthorized-domain') {
+                        alert("Error: Domain ini belum diizinkan di Firebase Console. Pastikan URL GitHub Pages kamu sudah ditambahkan ke 'Authorized Domains' di Firebase Authentication.");
+                    }
+                });
 
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     setUser(u);
                     setLoading(false);
                 });
-
                 return unsubscribe;
             }, []);
 
@@ -168,13 +172,12 @@
             }, [user]);
 
             const handleLogin = async () => {
-                setAuthError(null);
                 const provider = new firebase.auth.GoogleAuthProvider();
                 try {
                     await auth.signInWithRedirect(provider);
                 } catch (e) {
                     console.error("Login Initiation Error:", e);
-                    setAuthError(e.message);
+                    alert("Login Initiation Error: " + e.message);
                 }
             };
 
@@ -261,7 +264,7 @@
                         step: activeFilePrompt.step,
                         fileName: file.name,
                         uploadDate: new Date().toLocaleDateString('id-ID'),
-                        extractedText: extractedText.substring(0, 5000)
+                        extractedText: extractedText.substring(0, 5000) // Keep it small for firestore
                     };
 
                     const proj = projects.find(p => p.id === activeFilePrompt.id);
@@ -272,8 +275,10 @@
                         step: activeFilePrompt.step
                     });
                     
+                    // Re-check next requirements
                     const nextStepToCheck = activeFilePrompt.step;
                     setActiveFilePrompt(null);
+                    // trigger internal step update
                     updateStep(proj.id, nextStepToCheck);
                 };
 
@@ -303,11 +308,7 @@
                 return `${project.refNumber}/JBM/${month}/${year}`;
             };
 
-            if (loading) return (
-                <div className="min-h-screen flex items-center justify-center font-black uppercase tracking-widest text-slate-400">
-                    System Initializing...
-                </div>
-            );
+            if (loading) return <div className="min-h-screen flex items-center justify-center font-black uppercase tracking-widest text-slate-400">System Initializing...</div>;
 
             if (!user) {
                 return (
@@ -318,14 +319,6 @@
                                 <h1 className="text-2xl font-black tracking-widest uppercase mb-2">JBM <span className="text-indigo-500">Logistics</span></h1>
                                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[.3em]">Project Governance System v4.1</p>
                             </div>
-
-                            {authError && (
-                                <div className="bg-red-900/30 border border-red-500/30 rounded-xl p-4 text-left">
-                                    <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest">Auth Error</p>
-                                    <p className="text-[11px] text-red-300 mt-1 font-mono">{authError}</p>
-                                </div>
-                            )}
-
                             <button 
                                 onClick={handleLogin}
                                 className="w-full py-4 bg-white text-slate-950 rounded-xl font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-3 border border-slate-200 shadow-md active:scale-95"
@@ -341,6 +334,9 @@
                             <div className="pt-2">
                                 <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest leading-relaxed opacity-60">
                                     Status: <span className="text-emerald-500">System Ready</span>
+                                </p>
+                                <p className="text-[8px] text-slate-400 font-medium uppercase tracking-[0.2em] mt-2 opacity-40">
+                                    Pastikan GitHub Domain sudah ada di Authorized Domains
                                 </p>
                             </div>
                         </div>
@@ -360,9 +356,8 @@
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="hidden md:block text-[10px] font-bold text-slate-400 uppercase tracking-widest mr-2">{user.email}</span>
                                 <button onClick={handleLogout} className="w-9 h-9 md:w-10 md:h-10 bg-slate-50 border border-slate-200 flex items-center justify-center rounded-lg text-slate-500 hover:text-red-500 transition-all shadow-sm active:scale-95">
-                                    <Icon name="log-out" className="w-4 h-4 md:w-5 md:h-5" />
+                                    <Icon name="logOut" className="w-4 h-4 md:w-5 md:h-5" />
                                 </button>
                                 <button onClick={() => setShowForm(!showForm)} className={`w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-lg transition-all shadow-sm active:scale-95 border ${showForm ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-200' : 'bg-slate-50 border-slate-200 text-slate-500 hover:text-indigo-600'}`}>
                                     <Icon name="plus" className={`w-4 h-4 md:w-5 md:h-5 transition-transform ${showForm ? 'rotate-45' : ''}`} />
@@ -429,16 +424,11 @@
                             )}
                         </AnimatePresence>
 
-                        {/* Project List */}
+                        {/* List */}
                         <div className="space-y-4">
-                            {filteredProjects.length === 0 && (
-                                <div className="text-center py-20 text-slate-300">
-                                    <p className="text-[11px] font-black uppercase tracking-widest">No projects found</p>
-                                </div>
-                            )}
                             {filteredProjects.map(project => (
                                 <motion.div key={project.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all">
-                                    <div className="h-1 w-full" style={{ backgroundColor: project.pajak ? '#10b981' : '#6366f1' }} />
+                                    <div className="h-1 w-full bg-indigo-500" style={{ backgroundColor: project.pajak ? '#10b981' : '#6366f1' }} />
                                     <div className="p-5 md:p-6 space-y-6">
                                         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                             <div className="flex-1 space-y-3">
@@ -452,20 +442,20 @@
                                                     <span className="px-3 py-1.5 bg-slate-50 text-slate-500 rounded-lg text-[10px] font-bold uppercase border border-slate-100">PO: {project.po}</span>
                                                 </div>
                                             </div>
-                                            <div className="hidden md:flex flex-col items-end gap-1.5">
+                                            <div className="flex flex-col items-end gap-1.5 hidden md:flex">
                                                 <span className="text-[10px] font-black uppercase text-slate-400 tracking-[.2em]">Efficiency {Math.round((project.step / 8) * 100)}%</span>
                                                 <div className="w-48 h-1.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200/50">
-                                                    <div className="h-full bg-indigo-600 transition-all" style={{ width: `${(project.step / 8) * 100}%` }} />
+                                                    <div className="h-full bg-indigo-600" style={{ width: `${(project.step / 8) * 100}%` }} />
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-50">
                                             <textarea 
-                                                value={project.notes || ''} 
+                                                value={project.notes} 
                                                 onChange={e => updateProjectField(project.id, 'notes', e.target.value)}
                                                 placeholder="Input operational notes..."
-                                                className="w-full bg-slate-50/50 border border-slate-200/50 rounded-xl p-4 text-xs font-medium focus:bg-white outline-none min-h-[100px] transition-all resize-none"
+                                                className="w-full bg-slate-50/50 border border-slate-200/50 rounded-xl p-4 text-xs font-medium focus:bg-white outline-none min-h-[100px] transition-all"
                                             />
                                             <div className="space-y-3">
                                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Asset Verification Status</span>
@@ -484,15 +474,13 @@
 
                                         <div className="pt-6 border-t border-slate-50 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
                                             <div className="flex flex-col sm:flex-row gap-3">
-                                                <select value={project.step} onChange={e => updateStep(project.id, parseInt(e.target.value))} className="bg-slate-100 border-transparent rounded-xl px-4 py-3 text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer">
+                                                <select value={project.step} onChange={e => updateStep(project.id, parseInt(e.target.value))} className="bg-slate-100 border-transparent rounded-xl px-10 py-3 text-[11px] font-black uppercase tracking-widest outline-none cursor-pointer">
                                                     {STEPS.map((s, idx) => <option key={idx} value={idx+1}>{idx+1}. {s}</option>)}
                                                 </select>
-                                                <button onClick={() => togglePajak(project.id)} disabled={project.step < 8} className={`h-12 px-6 rounded-xl font-black text-[11px] uppercase tracking-widest border transition-all ${project.step < 8 ? 'text-slate-200 border-slate-50 cursor-not-allowed' : project.pajak ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-400'}`}>Verify PPN</button>
+                                                <button onClick={() => togglePajak(project.id)} disabled={project.step < 8} className={`h-12 px-6 rounded-xl font-black text-[11px] uppercase tracking-widest border transition-all ${project.step < 8 ? 'text-slate-200 border-slate-50' : project.pajak ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200'}`}>Verify PPN</button>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <button onClick={() => deleteProject(project.id)} className="w-12 h-12 bg-slate-50 text-slate-400 hover:text-red-500 border border-slate-100 rounded-xl flex items-center justify-center transition-all active:scale-95">
-                                                    <Icon name="trash-2" className="w-5 h-5" />
-                                                </button>
+                                                <button onClick={() => deleteProject(project.id)} className="w-12 h-12 bg-slate-50 text-slate-400 hover:text-red-500 border border-slate-100 rounded-xl flex items-center justify-center transition-all"><Icon name="trash2" className="w-5 h-5" /></button>
                                             </div>
                                         </div>
                                     </div>
@@ -506,9 +494,7 @@
                         {activeFilePrompt && (
                             <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
                                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl border border-slate-100 text-center">
-                                    <div className="w-16 h-16 bg-amber-50 rounded-2xl mx-auto flex items-center justify-center mb-6 text-amber-600 border border-amber-100">
-                                        <Icon name="alert-circle" className="w-8 h-8" />
-                                    </div>
+                                    <div className="w-16 h-16 bg-amber-50 rounded-2xl mx-auto flex items-center justify-center mb-6 text-amber-600 border border-amber-100"><Icon name="alertCircle" className="w-8 h-8" /></div>
                                     <h3 className="text-sm font-black uppercase tracking-widest mb-2">Requirement Protocol</h3>
                                     <p className="text-[11px] text-slate-400 font-medium uppercase tracking-widest leading-relaxed mb-8">Phase {activeFilePrompt.step} mandates the upload of <span className="text-indigo-600 font-black">{STEP_REQUIREMENTS[activeFilePrompt.step]}</span> to proceed.</p>
                                     <label className="block w-full cursor-pointer group">
@@ -518,7 +504,7 @@
                                         </div>
                                         <input type="file" onChange={handleFileUpload} className="hidden" />
                                     </label>
-                                    <button onClick={() => setActiveFilePrompt(null)} className="w-full mt-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Bypass Protocol</button>
+                                    <button onClick={() => setActiveFilePrompt(null)} className="w-full mt-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600">Bypass Protocol</button>
                                 </motion.div>
                             </div>
                         )}
