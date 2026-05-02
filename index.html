@@ -140,6 +140,18 @@
 
             // Auth State
             useEffect(() => {
+                // Handle Redirect Result for GitHub Pages compatibility
+                auth.getRedirectResult().then((result) => {
+                    if (result && result.user) {
+                        console.log("Login successful via redirect:", result.user);
+                    }
+                }).catch((error) => {
+                    console.error("Redirect Auth Error:", error);
+                    if (error.code === 'auth/unauthorized-domain') {
+                        alert("Error: Domain ini belum diizinkan di Firebase Console. Pastikan URL GitHub Pages kamu sudah ditambahkan ke 'Authorized Domains' di Firebase Authentication.");
+                    }
+                });
+
                 const unsubscribe = auth.onAuthStateChanged((u) => {
                     setUser(u);
                     setLoading(false);
@@ -162,16 +174,10 @@
             const handleLogin = async () => {
                 const provider = new firebase.auth.GoogleAuthProvider();
                 try {
-                    await auth.signInWithPopup(provider);
+                    await auth.signInWithRedirect(provider);
                 } catch (e) {
-                    console.error("Login Error:", e);
-                    if (e.code === 'auth/popup-closed-by-user') {
-                        // Ignore
-                    } else if (e.code === 'auth/unauthorized-domain') {
-                        alert("Error: Domain ini belum diizinkan di Firebase Console. Pastikan URL ini sudah ditambahkan ke 'Authorized Domains' di Firebase Authentication.");
-                    } else {
-                        alert("Login Error: " + e.message);
-                    }
+                    console.error("Login Initiation Error:", e);
+                    alert("Login Initiation Error: " + e.message);
                 }
             };
 
